@@ -1,9 +1,8 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdint.h>
-#define _GNU_SOURCE
-#include <sched.h>
 #include <time.h>
+#include <pthread.h>
 
 #define ERROR_DECODING 0x1
 #define ERROR_FILE     0
@@ -53,7 +52,7 @@ struct decoded_instruction {
 	uint8_t rs1; // 0 for J and U types
 };
 
-int decode_instruction(void* decode);
+void* decode_instruction(void* decode);
 
 static int decode(struct decoder_state* state, FILE* file, uint64_t len) {
 	struct timeval start, end;
@@ -61,20 +60,32 @@ static int decode(struct decoder_state* state, FILE* file, uint64_t len) {
 
 	uint32_t instruction[4];
 	struct decoded_instruction decoded_buffer[4];
-	int decoding = 0, p1 = 0, p2 = 0, p3 = 0, p4= 0;
+	int decoding = 0;
+	pthread_t p1, p2, p3, p4;
 
 	while (state->pc < len) {
 		if (state->pc + 16 < len) {
 			fread(&instruction, sizeof(uint32_t), 4, file);
 			state->pc += 16;
-			if (decoding)
+			if (decoding) {
+				pthread_join(p1, NULL);
+				pthread_join(p2, NULL);
+				pthread_join(p3, NULL);
+				pthread_join(p4, NULL);
+				decoding = 0;
+			}
 
-			p1 = clone(&decode_instruction, NULL, CLONE_VM | CLONE_SIGHAND, &decoded_buffer[0]);
-			p2 = clone(&decode_instruction, NULL, CLONE_VM | CLONE_SIGHAND, &decoded_buffer[1]);
-			p3 = clone(&decode_instruction, NULL, CLONE_VM | CLONE_SIGHAND, &decoded_buffer[2]);
-			p4 = clone(&decode_instruction, NULL, CLONE_VM | CLONE_SIGHAND, &decoded_buffer[3]);
+			decoded_buffer[0].original = instruction[0];
+			decoded_buffer[1].original = instruction[1];
+			decoded_buffer[2].original = instruction[2];
+			decoded_buffer[3].original = instruction[3];
+
+			pthread_create(&p1, NULL, &decode_instruction, &decoded_buffer[0]);
+			pthread_create(&p2, NULL, &decode_instruction, &decoded_buffer[1]);
+			pthread_create(&p3, NULL, &decode_instruction, &decoded_buffer[2]);
+			pthread_create(&p4, NULL, &decode_instruction, &decoded_buffer[3]);
+			decoding = 1;
 		}
-
 		else { // At this stage we have any of {4,8,12} bytes left
 			fread(&instruction, sizeof(uint32_t), 1, file);
 			state->pc += 4;
@@ -90,8 +101,8 @@ static int decode(struct decoder_state* state, FILE* file, uint64_t len) {
 	return 0;
 }
 
-int decode_instruction(void* decode) {
+void* decode_instruction(void* decode) {
 	struct decoded_instruction* ins = decode;
-	return 0;
+	return NULL;
 }
 
