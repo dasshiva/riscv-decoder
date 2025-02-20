@@ -88,21 +88,21 @@ static int decode(struct decoder_state* state, FILE* file, uint64_t len) {
 		}
 		else { // At this stage we have any of {4,8,12} bytes left
 			fread(&instruction, sizeof(uint32_t), 1, file);
+			decoded_buffer[0].original = instruction[0];
+			decode_instruction(&decoded_buffer[0]);
 			state->pc += 4;
 		}
 	}
 
 	gettimeofday(&end, NULL);
-	if (end.tv_usec - start.tv_usec < 1000) 
-		printf("Time taken to decode = %ld micros", end.tv_usec - start.tv_usec);
-	else
-		printf("Time taken to decode = %lf millis", ((double)(end.tv_usec - start.tv_usec)) / 1000);
+	printf("Time taken to decode = %lf millis", ((double)(end.tv_usec - start.tv_usec)) / 1000);
 
 	return 0;
 }
 
 void* decode_instruction(void* decode) {
 	struct decoded_instruction* ins = decode;
+	uint32_t target = ins->original;
 	return NULL;
 }
 
